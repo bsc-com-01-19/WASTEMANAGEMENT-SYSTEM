@@ -23,6 +23,11 @@ data class GarbageLevelEntry(
     val timestamp: Long
 )
 
+data class User(
+    val username: String,
+    val password: String // In a real application, ensure to hash the password
+)
+
 object BinContract {
     object BinEntry : BaseColumns {
         const val TABLE_NAME = "bins"
@@ -41,6 +46,14 @@ object GarbageLevelContract {
         const val COLUMN_NAME_BIN_ID = "bin_id"
         const val COLUMN_NAME_GARBAGE_LEVEL = "garbage_level"
         const val COLUMN_NAME_TIMESTAMP = "timestamp"
+    }
+}
+
+object UserContract {
+    object UserEntry : BaseColumns {
+        const val TABLE_NAME = "users"
+        const val COLUMN_NAME_USERNAME = "username"
+        const val COLUMN_NAME_PASSWORD = "password"
     }
 }
 
@@ -63,7 +76,16 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         )
     """.trimIndent()
 
+    private val SQL_CREATE_USER_ENTRIES = """
+        CREATE TABLE ${UserContract.UserEntry.TABLE_NAME} (
+            ${BaseColumns._ID} INTEGER PRIMARY KEY AUTOINCREMENT,
+            ${UserContract.UserEntry.COLUMN_NAME_USERNAME} TEXT UNIQUE,
+            ${UserContract.UserEntry.COLUMN_NAME_PASSWORD} TEXT
+        )
+    """.trimIndent()
+
     private val SQL_DELETE_ENTRIES = "DROP TABLE IF EXISTS ${BinContract.BinEntry.TABLE_NAME}"
+    private val SQL_DELETE_USER_ENTRIES = "DROP TABLE IF EXISTS ${UserContract.UserEntry.TABLE_NAME}"
 
     private val SQL_CREATE_GARBAGE_LEVEL_ENTRIES = """
         CREATE TABLE ${GarbageLevelContract.GarbageLevelEntry.TABLE_NAME} (
@@ -74,16 +96,21 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         )
     """.trimIndent()
 
-    private val SQL_DELETE_GARBAGE_LEVEL_ENTRIES =
-        "DROP TABLE IF EXISTS ${GarbageLevelContract.GarbageLevelEntry.TABLE_NAME}"
+    private val SQL_DELETE_GARBAGE_LEVEL_ENTRIES = "DROP TABLE IF EXISTS ${GarbageLevelContract.GarbageLevelEntry.TABLE_NAME}"
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(SQL_CREATE_ENTRIES)
         db.execSQL(SQL_CREATE_GARBAGE_LEVEL_ENTRIES)
+        db.execSQL(SQL_CREATE_USER_ENTRIES)
         Log.d("DatabaseHelper", "Database tables created")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 1) {
+            db.execSQL(SQL_DELETE_USER_ENTRIES)
+            db.execSQL(SQL_CREATE_USER_ENTRIES)
+        }
+
         db.execSQL(SQL_DELETE_ENTRIES)
         db.execSQL(SQL_DELETE_GARBAGE_LEVEL_ENTRIES)
         onCreate(db)
@@ -105,6 +132,51 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         db.close()
         Log.d("DatabaseHelper", "Inserted bin with id: $newRowId")
         return newRowId
+    }
+
+    fun insertUser(user: User): Long {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(UserContract.UserEntry.COLUMN_NAME_USERNAME, user.username)
+            put(UserContract.UserEntry.COLUMN_NAME_PASSWORD, user.password) // Store hashed password in a real app
+        }
+        val newRowId = db.insertWithOnConflict(UserContract.UserEntry.TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE)
+        db.close()
+        Log.d("DatabaseHelper", "Inserted user with id: $newRowId")
+        return newRowId
+    }
+
+    fun getUser(username: String): User? {
+        val db = readableDatabase
+        val projection = arrayOf(
+            UserContract.UserEntry.COLUMN_NAME_USERNAME,
+            UserContract.UserEntry.COLUMN_NAME_PASSWORD
+        )
+        val selection = "${UserContract.UserEntry.COLUMN_NAME_USERNAME} = ?"
+        val selectionArgs = arrayOf(username)
+
+        val cursor: Cursor = db.query(
+            UserContract.UserEntry.TABLE_NAME,
+            projection,
+            selection,
+            selectionArgs,
+            null,
+            null,
+            null
+        )
+
+        val user = if (cursor.moveToFirst()) {
+            User(
+                username = cursor.getString(cursor.getColumnIndexOrThrow(UserContract.UserEntry.COLUMN_NAME_USERNAME)),
+                password = cursor.getString(cursor.getColumnIndexOrThrow(UserContract.UserEntry.COLUMN_NAME_PASSWORD))
+            )
+        } else {
+            null
+        }
+        cursor.close()
+        db.close()
+        Log.d("DatabaseHelper", "Retrieved user: $user")
+        return user
     }
 
     fun getAllBins(): List<Bin> {

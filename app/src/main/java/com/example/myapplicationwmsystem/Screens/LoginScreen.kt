@@ -3,25 +3,12 @@ package com.example.myapplicationwmsystem.Screens
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,13 +18,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.myapplicationwmsystem.R
-
+import com.example.myapplicationwmsystem.db.DatabaseHelper
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit, onSignUp: () -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val databaseHelper = remember { DatabaseHelper(context) }
 
     Box(
         contentAlignment = Alignment.Center,
@@ -51,7 +39,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSignUp: () -> Unit) {
                 contentDescription = "Profile Image",
                 modifier = Modifier
                     .size(100.dp)
-                    //.background(MaterialTheme.colorScheme.primary, shape = CircleShape)
                     .padding(16.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -75,10 +62,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onSignUp: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = {
-                    val sharedPref = context.getSharedPreferences("user_credentials", Context.MODE_PRIVATE)
-                    val storedUsername = sharedPref.getString("username", "")
-                    val storedPassword = sharedPref.getString("password", "")
-                    if (username == storedUsername && password == storedPassword) {
+                    val user = databaseHelper.getUser(username)
+                    if (user != null && user.password == password) { // Compare hashed passwords in a real app
                         onLoginSuccess()
                     } else {
                         Toast.makeText(context, "Invalid credentials", Toast.LENGTH_SHORT).show()

@@ -15,6 +15,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplicationwmsystem.db.DatabaseHelper
+import com.example.myapplicationwmsystem.db.User
 
 @Composable
 fun SignUpScreen(onSignUpSuccess: () -> Unit) {
@@ -23,6 +25,7 @@ fun SignUpScreen(onSignUpSuccess: () -> Unit) {
     var confirmPassword by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val databaseHelper = remember { DatabaseHelper(context) }
 
     Box(
         contentAlignment = Alignment.Center,
@@ -43,6 +46,7 @@ fun SignUpScreen(onSignUpSuccess: () -> Unit) {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
+            // Username field
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
@@ -53,6 +57,7 @@ fun SignUpScreen(onSignUpSuccess: () -> Unit) {
                 isError = errorMessage.contains("Username")
             )
 
+            // Password field
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -68,6 +73,7 @@ fun SignUpScreen(onSignUpSuccess: () -> Unit) {
                 isError = errorMessage.contains("Password")
             )
 
+            // Confirm Password field
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
@@ -80,38 +86,40 @@ fun SignUpScreen(onSignUpSuccess: () -> Unit) {
                     imeAction = ImeAction.Done
                 ),
                 visualTransformation = PasswordVisualTransformation(),
-                isError = errorMessage.contains("Password")
+                isError = errorMessage.contains("Confirm Password")
             )
 
-            Button(
-                onClick = {
-                    if (password != confirmPassword) {
-                        errorMessage = "Passwords do not match"
-                    } else if (username.isEmpty() || password.isEmpty()) {
-                        errorMessage = "Username and Password cannot be empty"
-                    } else {
-                        val sharedPref = context.getSharedPreferences("user_credentials", Context.MODE_PRIVATE)
-                        with(sharedPref.edit()) {
-                            putString("username", username)
-                            putString("password", password)
-                            apply()
-                        }
-                        errorMessage = ""
-                        onSignUpSuccess()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Register", fontSize = 16.sp)
-            }
-
+            // Error message
             if (errorMessage.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = errorMessage,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
+                    color = Color.Red,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
+            }
+
+            // Sign Up button
+            Button(onClick = {
+                if (username.isEmpty()) {
+                    errorMessage = "Username cannot be empty"
+                } else if (password.isEmpty()) {
+                    errorMessage = "Password cannot be empty"
+                } else if (password != confirmPassword) {
+                    errorMessage = "Passwords do not match"
+                } else {
+                    val userExists = databaseHelper.getUser(username) != null
+                    if (userExists) {
+                        errorMessage = "Username already exists"
+                    } else {
+                        // Insert the new user into the database
+                        val newUser = User(username, password)
+                        databaseHelper.insertUser(newUser)
+                        onSignUpSuccess()
+                    }
+                }
+            }) {
+                Text("Sign Up")
             }
         }
     }
